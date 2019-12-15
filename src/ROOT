@@ -1,0 +1,9 @@
+chapter CS732
+
+session Homework14 (CS732) = HOL +
+	options [timeout = 600]
+	sessions
+		"HOL-Library"
+	theories
+		Base
+
