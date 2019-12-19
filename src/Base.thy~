@@ -40,22 +40,6 @@ datatype "term" =
 inductive "value" :: "term => bool" where
 	"value (Abstraction _ _ _)"
 
-primrec
-  substn :: "[term, term, nat] => term"
-where
-    "substn (Var i) s k =
-      (if k < i then Var (i - 1) else if i = k then liftn k s 0 else Var i)"
-  | "substn (t ° u) s k = substn t s k ° substn u s k"
-  | "substn (Abs k T t) s k = Abs (substn t s (k + 1))"
-
-text \<open> TODO: Add value requirements\<close>
-inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarrow>" 50)
-  where
-    e_app_1: "t1 \<rightarrow> t1' \<Longrightarrow> t1 \<degree> t2 \<rightarrow> t1' \<degree> t2"
-    e_app_2: "t2 \<rightarrow> t2' \<Longrightarrow> t1 \<degree> t2 \<rightarrow> t1 \<degree> t2'"
-    e_app_abs: "Abs x T t"
-
-
 inductive
 	typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50] 50)
 
@@ -69,4 +53,3 @@ inductive_cases typing_elims [elim!]:
   "\<Gamma> ⊢ Var x : T"
   "\<Gamma> ⊢ t \<degree> u : T"
   "\<Gamma> ⊢ Abs x T1 t : T"
-
