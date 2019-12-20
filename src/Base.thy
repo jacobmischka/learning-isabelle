@@ -123,7 +123,20 @@ lemma canonical_forms_unit:
 theorem progress:
 	assumes d: "\<Gamma> ⊢ t : T"
 	shows "(value t) | (t \<rightarrow> t')"
-	sorry
+	using d proof cases
+case (t_abs x T1 t2 T2)
+  then show ?thesis
+    by (simp add: val_abs)
+next
+  case (t_var x)
+  then show ?thesis sorry
+next
+case (t_app t1 T1 t2)
+  then show ?thesis sorry
+next
+  case t_unit
+  then show ?thesis by (simp add: val_unit)
+qed
 
 lemma subst_lemma:
 	assumes d1: "\<Gamma>, <x:T2> ⊢ t1 : T1"
@@ -135,4 +148,18 @@ theorem preservation:
 	assumes d: "\<Gamma> ⊢ t : T"
 		and e: "t \<rightarrow> t'"
 	shows "\<Gamma> ⊢ t' : T"
-	sorry
+	using d proof induction
+case (t_abs Γ x T1 t2 T2)
+then show ?case sorry
+next
+  case (t_var Γ x T)
+  then show ?case sorry
+next
+  case (t_app Γ t1 T1 T2 t2)
+  then show ?case sorry
+next
+  case (t_unit Γ)
+  then show ?case sorry
+
+qed
+
