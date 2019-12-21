@@ -5,11 +5,12 @@ imports Main
 begin
 
 type_synonym varName = nat
-type_synonym typeName = nat
+type_synonym typeVarName = nat
 
 datatype "type" =
-	Atom typeName
+	TVar typeVarName
 	| Arrow type type (infixr "->" 200)
+        | ForallType typeVarName type ("* _ . _" [90, 0] 91)
 	| Unit
 
 type_synonym varCtx = "varName => type"
@@ -18,7 +19,9 @@ type_synonym varCtx = "varName => type"
 datatype "term" =
       var "varName"
       | abs varName "type" "term"
+      | tabs typeVarName "term" ("% _ . _" [90, 0] 91)
       | app "term" "term"
+      | tapp "term" "type" ("_[_]" [90, 0] 91)
       | unit
 
 
@@ -42,13 +45,32 @@ where
     "lift (var i) x = (if i < x then var i else var (i + 1))"
   | "lift (app s t) x = app (lift s x) (lift t x)"
   | "lift (abs x T s) y = abs x T (lift s (y + 1))"
+  | "lift (tabs X t) y = tabs X (lift t (y + 1))"
+  | "lift (tapp t T) y = tapp (lift t y) T"
   | "lift unit x = unit"
+
+primrec
+  tlift :: "[type, varName] => type"
+where
+    "tlift (TVar X) Y = (if X < Y then TVar X else TVar (X + 1))"
+    | "tlift (T1 -> T2) Y = (tlift T1 Y) -> (tlift T2 Y)"
+    | "tlift (* X . T) Y = * X . (tlift T (Y + 1))"
+    | "tlift Unit Y = Unit"
+
+primrec subst_type :: "[type, typeVarName, type] => type" ("_[_ ~~> _]" [300, 0, 0] 300)
+	where
+	tsubst_tvar: "(TVar X)[Y ~~> T2] = (if X = Y then T2 else if X < Y then TVar X else TVar (X - 1))"
+        | tsubst_arrow: "(T1 -> T2)[Y ~~> T3] = (T1[Y ~~> T3] -> T2[Y ~~> T3])"
+        | tsubst_forall: "(* X . T)[Y ~~> T2] = * X . T[Y + 1 ~~> tlift T 0]"
+        | tsubst_unit: "Unit[Y ~~> T2] = Unit"
 
 primrec subst_term :: "[term, varName, term] => term" ("_[_ ~> _]" [300, 0, 0] 300)
 	where
 	subst_var: "(var x)[y ~> t] = (if x = y then t else if x < y then var x else var (x - 1))"
 	| subst_app: "(app t1 t2)[y ~> t] = app (t1[y ~> t]) (t2[y ~> t])"
+        | subst_tapp: "(tapp t1 T2)[y ~> t] = tapp (t1[y ~> t]) T2"
 	| subst_abs: "(abs x T1 t1)[y ~> t] = abs x T1 (t1[y + 1 ~> lift t 0])"
+        | subst_tabs: "(tabs X t)[y ~> t'] = tabs X (t[y ~> t'])"
 	| subst_unit: "unit[y ~> t] = unit"
 
 inductive "value" :: "term => bool"
@@ -66,13 +88,16 @@ inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarro
 inductive typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50] 50)
   where
     t_abs [intro!]: "\<Gamma>, <x:T1> ⊢ t2 : T2 ==> \<Gamma> ⊢ abs x T1 t2 : (T1 -> T2)"
+  | t_tabs [intro!]: "\<Gamma>, <X:X> ⊢ t2 : T2 ==> \<Gamma> ⊢ tabs X t : * X . T"
   | t_var [intro!]: "\<Gamma>(x) = T ==> \<Gamma> ⊢ var x : T"
   | t_app [intro!]: "\<Gamma> ⊢ t1 : (T1 -> T2) ==> \<Gamma> ⊢ t2 : T1 ==> \<Gamma>  ⊢ app t1 t2 : T2"
+  | t_tapp [intro!]: "\<Gamma> ⊢ t1 : * X . T1 ==> \<Gamma> ⊢ tapp t1 T2 : T1"
   | t_unit [intro!]: "\<Gamma> ⊢ unit : Unit"
 
 inductive_cases typing_elims [elim!]:
   "\<Gamma> ⊢ var x : T"
   "\<Gamma> ⊢ app t u : T"
+  "\<Gamma> ⊢ tabs X t : T"
   "\<Gamma> ⊢ abs x T1 t : T"
   "\<Gamma> ⊢ unit : Unit"
 
