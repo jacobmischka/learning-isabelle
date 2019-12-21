@@ -107,7 +107,7 @@ theorem progress:
   fixes t :: "term"
   fixes t' :: "term"
 	assumes d: "\<Gamma> ⊢ t : T"
-	shows "(value t) | (t \<rightarrow> t')"
+	shows "(value t) | (\<exists> t' . t \<rightarrow> t')"
 	using d
   proof induction
     case (t_abs Γ x T1 t2 T2)
@@ -130,22 +130,23 @@ theorem progress:
       from t2ih show ?case
       proof
         assume t2v: "value t2"
-        have t1_abs: "t1 = abs x T3 t3"
-          sorry
+        then obtain x T3 t3 where
+          t1_abs: "t1 = abs x T3 t3"
+          using canonical_forms_abs pt1 t1v by blast
         then have "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
-        show ?case sorry
+        show ?case sledgehammer
+          using ‹app (term.abs x T3 t3) t2 → t3[x ~> t2]› t1_abs by blast
       next
         assume t2e: "t2 \<rightarrow> t2'"
         have te: "app t1 t2 \<rightarrow> app t1 t2'"
           by (simp add: e_app_2 t1v t2e)
-        from te show ?case
-          sorry
+        from te show ?case by auto
       qed
     next
       assume t1e: "t1 \<rightarrow> t1'"
       have te: "app t1 t2 \<rightarrow> app t1' t2"
         by (simp add: e_app_1 t1e)
-      then show ?case sorry
+      then show ?case by auto
     qed
   next
     case (t_unit Γ)
@@ -195,7 +196,30 @@ theorem preservation:
       and dih2: "t2 → t2' ⟹ Γ ⊢ t2' : T1"
       and de: "app t1 t2 \<rightarrow> t'"
       by auto
-    then show ?case using de.cases
+    from de dih1 dih2 show ?case
+    proof cases
+      case (e_app_1 t1')
+      from this have "app t1 t2 \<rightarrow> app t1' t2" sledgehammer
+        using t_app.prems by blast
+      from this have "t1 \<rightarrow> t1'"
+        using local.e_app_1(2) by blast
+      from this have "Γ ⊢ t1' : T1 -> T2" sorry
+      next
+        case (e_app_2 t2')
+        from this have "app t1 t2 \<rightarrow> app t1 t2'" sledgehammer
+          using t_app.prems by blast
+        from this have "t2 \<rightarrow> t2'"
+          sledgehammer
+          by (simp add: local.e_app_2(3))
+        from this dih2 show ?thesis sorry
+      next
+        case (e_app_abs x T t)
+        from this have "app t1 t2 \<rightarrow> t[x ~> t2]"
+          using t_app.prems by blast
+      then show ?thesis
+        using local.e_app_abs(1) local.e_app_abs(2) p1 p2 subst_lemma by blast
+    qed
+          
   next
     case (t_unit Γ)
     then show ?case
