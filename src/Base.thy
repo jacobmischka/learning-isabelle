@@ -62,7 +62,7 @@ inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarro
   where
     e_app_1: "t1 \<rightarrow> t1' \<Longrightarrow> app t1 t2 \<rightarrow> app t1' t2"
   | e_app_2: "value t1 \<Longrightarrow> t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
-  | e_app_abs: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (substn t t2 x)"
+  | e_app_abs: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (t[x ~> t2])"
 
 
 inductive typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50] 50)
@@ -132,17 +132,20 @@ theorem progress:
         assume t2v: "value t2"
         have t1_abs: "t1 = abs x T3 t3"
           sorry
+        then have "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
+        show ?case sorry
       next
         assume t2e: "t2 \<rightarrow> t2'"
         have te: "app t1 t2 \<rightarrow> app t1 t2'"
           by (simp add: e_app_2 t1v t2e)
-        show "value (app t1 t2) ∨ app t1 t2 → t'" sorry
+        from te show ?case
+          sorry
       qed
     next
       assume t1e: "t1 \<rightarrow> t1'"
       have te: "app t1 t2 \<rightarrow> app t1' t2"
         by (simp add: e_app_1 t1e)
-      show "value (app t1 t2) ∨ app t1 t2 → t'" sorry
+      then show ?case sorry
     qed
   next
     case (t_unit Γ)
@@ -185,7 +188,14 @@ theorem preservation:
       using evaluation.cases by blast
   next
     case (t_app Γ t1 T1 T2 t2)
-    then show ?case using evaluation.cases sorry
+    then obtain t1' t2' where
+      p1: "Γ ⊢ t1 : T1 -> T2"
+      and p2: "Γ ⊢ t2 : T1"
+      and dih1: "t1 → t1' ==> Γ ⊢ t1' : T1 -> T2"
+      and dih2: "t2 → t2' ⟹ Γ ⊢ t2' : T1"
+      and de: "app t1 t2 \<rightarrow> t'"
+      by auto
+    then show ?case using de.cases
   next
     case (t_unit Γ)
     then show ?case
