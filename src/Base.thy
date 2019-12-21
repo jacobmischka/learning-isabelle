@@ -182,7 +182,7 @@ lemma subst_lemma:
 lemma values_dont_evaluate:
   fixes t :: "term"
   assumes v: "value t"
-    and e: "\<forall> t'. t \<rightarrow> t'"
+    and e: "\<exists> t'. t \<rightarrow> t'"
   shows False
   using e evaluation.cases v value.simps by blast
 
