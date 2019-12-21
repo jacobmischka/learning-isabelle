@@ -61,9 +61,9 @@ inductive "value" :: "term => bool"
 
 inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarrow>" 50)
   where
-    e_app_1: "t1 \<rightarrow> t1' \<Longrightarrow> app t1 t2 \<rightarrow> app t1' t2"
-  | e_app_2: "value t1 \<Longrightarrow> t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
-  | e_app_abs: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (t[x ~> t2])"
+    e_app_1 [intro!]: "t1 \<rightarrow> t1' \<Longrightarrow> app t1 t2 \<rightarrow> app t1' t2"
+  | e_app_2 [intro!]: "value t1 \<Longrightarrow> t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
+  | e_app_abs [intro!]: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (t[x ~> t2])"
 
 
 inductive typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50] 50)
@@ -164,6 +164,7 @@ lemma subst_lemma:
   fixes T2 :: "type"
 	assumes d1: "\<Gamma>, <x:T2> ⊢ t1 : T1"
 		and d2: "\<Gamma> ⊢ t2 : T2"
+	  and empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
 	using d1 d2
   proof induction
@@ -188,7 +189,15 @@ lemma subst_lemma:
     then show ?case by auto
   qed
 
+lemma values_dont_evaluate:
+  fixes t :: "term"
+  assumes v: "value t"
+    and e: "\<forall> t'. t \<rightarrow> t'"
+  shows False
+  using e evaluation.cases v value.simps by blast
+
 theorem preservation:
+  fixes t t' :: "term"
 	assumes d: "\<Gamma> ⊢ t : T"
 		and e: "t \<rightarrow> t'"
 	shows "\<Gamma> ⊢ t' : T"
@@ -203,6 +212,7 @@ theorem preservation:
       using evaluation.cases by blast
   next
     case (t_app Γ t1 T1 T2 t2)
+    (*
     then obtain t1' t2' where
       p1: "Γ ⊢ t1 : T1 -> T2"
       and p2: "Γ ⊢ t2 : T1"
@@ -210,35 +220,31 @@ theorem preservation:
       and dih2: "t2 → t2' ⟹ Γ ⊢ t2' : T1"
       and de: "app t1 t2 \<rightarrow> t'"
       by auto
-    from de dih1 dih2 show ?case
-    proof cases
+*)
+    
+    from this(5) show ?case
+    proof (cases)
       case (e_app_1 t1')
-      from this have "app t1 t2 \<rightarrow> app t1' t2"
-        using t_app.prems by blast
-      from this have "t1 \<rightarrow> t1'"
-        using local.e_app_1(2) by blast
-      from this dih1 have "Γ ⊢ t1' : T1 -> T2" sorry
-      from this show ?thesis
-        using local.e_app_1(1) p2 by blast
+
+      from this have "Γ ⊢ t1' : T1 -> T2" 
+        sorry
+      show ?thesis sorry
     next
         case (e_app_2 t2')
         from this have "app t1 t2 \<rightarrow> app t1 t2'"
           using t_app.prems by blast
         from this have "t2 \<rightarrow> t2'"
           by (simp add: local.e_app_2(3))
-        from this dih2 have "Γ ⊢ t2' : T1"  sorry
+        from this have "Γ ⊢ t2' : T1"  sorry
         from this show ?thesis
-          using local.e_app_2(1) p1 by blast
+          using local.e_app_2(1) t_app.hyps(1) by blast
     next
         case (e_app_abs x T t)
         from this have "app t1 t2 \<rightarrow> t[x ~> t2]"
           using t_app.prems by blast
-      then show ?thesis
-        using local.e_app_abs(1) local.e_app_abs(2) p1 p2 subst_lemma by blast
-    qed 
-  next
-    case (t_unit Γ)
-    then show ?case
-      using evaluation.cases by blast
+      from this show ?thesis
+        
+        sorry
+    qed
   qed
 
