@@ -36,9 +36,6 @@ lemma shift_gt [simp]: "j < i \<Longrightarrow> (\<Gamma>, <i:T>) j = \<Gamma> j
 lemma shift_lt [simp]: "i < j \<Longrightarrow> (\<Gamma>, <i:T>) j = \<Gamma> (j - 1)"
   by (simp add: shift_def)
 
-lemma shift_commute [simp]: "\<Gamma>, <i:U>, <0:T> = \<Gamma>, <0:T>, <Suc i:U>"
-  by (rule ext) (simp_all add: shift_def split: nat.split)
-
 primrec
   lift :: "[term, varName] => term"
 where
@@ -158,28 +155,21 @@ theorem progress:
 qed
 
 lemma subst_lemma:
-  fixes t1 :: "term"
-  fixes t2 :: "term"
-  fixes T1 :: "type"
-  fixes T2 :: "type"
+  fixes t1 t2 :: "term"
+  fixes T1 T2 :: "type"
+  fixes \<Gamma> :: "varCtx"
 	assumes d1: "\<Gamma>, <x:T2> ⊢ t1 : T1"
 		and d2: "\<Gamma> ⊢ t2 : T2"
 	  and empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
-	using d1 d2
-  proof induction
+  using d1 d2 empty_context proof induction
     case (t_abs Γ x T1 t2 T2)
-    then obtain t2 T2 where
-      "Γ, <x:T1> ⊢ t2 : T2"
-      and "Γ ⊢ t2 : T2 ⟹ Γ ⊢ t2[x ~> t2] : T2"
-      and "Γ ⊢ t2 : T2"
-      by force
-
-    then show ?case sorry
+    then show ?case 
+      by blast
   next
     case (t_var Γ x T)
     then show ?case
-      sorry
+      by blast
   next
     case (t_app Γ t1 T1 T2 t2)
     then show ?case
@@ -212,23 +202,14 @@ theorem preservation:
       using evaluation.cases by blast
   next
     case (t_app Γ t1 T1 T2 t2)
-    (*
-    then obtain t1' t2' where
-      p1: "Γ ⊢ t1 : T1 -> T2"
-      and p2: "Γ ⊢ t2 : T1"
-      and dih1: "t1 → t1' ==> Γ ⊢ t1' : T1 -> T2"
-      and dih2: "t2 → t2' ⟹ Γ ⊢ t2' : T1"
-      and de: "app t1 t2 \<rightarrow> t'"
-      by auto
-*)
     
-    from this(5) show ?case
+    from this(5) this(1-4) show ?case
     proof (cases)
       case (e_app_1 t1')
-
-      from this have "Γ ⊢ t1' : T1 -> T2" 
+      from this(2)  have "Γ ⊢ t1' : T1 -> T2"
         sorry
-      show ?thesis sorry
+      show ?thesis
+        using ‹Γ ⊢ t1' : T1 -> T2› local.e_app_1(1) t_app.hyps(2) by blast
     next
         case (e_app_2 t2')
         from this have "app t1 t2 \<rightarrow> app t1 t2'"

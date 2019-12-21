@@ -102,8 +102,7 @@ lemma canonical_forms_unit [simp]:
 	shows "t = unit" using d v value.simps by auto
 
 theorem progress:
-  fixes t :: "term"
-  fixes t' :: "term"
+  fixes t t' :: "term"
   fixes T :: "type"
 	assumes d: "\<Gamma> ⊢ t : T"
   assumes empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
@@ -190,9 +189,14 @@ theorem preservation:
   fixes t t' :: "term"
 	assumes d: "\<Gamma> ⊢ t : T"
 		and e: "t \<rightarrow> t'"
+		and empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "\<Gamma> ⊢ t' : T"
 	using d e
-  proof induction
+  proof (induction arbitrary: t')
+    case (t_unit Γ)
+    then show ?case
+      using empty_context by blast
+  next
     case (t_abs Γ x T1 t2 T2)
     then show ?case
     using evaluation.cases by blast
@@ -206,8 +210,8 @@ theorem preservation:
     from this(5) this(1-4) show ?case
     proof (cases)
       case (e_app_1 t1')
-      from this(2)  have "Γ ⊢ t1' : T1 -> T2"
-        sorry
+      from this t_app have "Γ ⊢ t1' : T1 -> T2"
+        by blast
       show ?thesis
         using ‹Γ ⊢ t1' : T1 -> T2› local.e_app_1(1) t_app.hyps(2) by blast
     next
@@ -216,7 +220,8 @@ theorem preservation:
           using t_app.prems by blast
         from this have "t2 \<rightarrow> t2'"
           by (simp add: local.e_app_2(3))
-        from this have "Γ ⊢ t2' : T1"  sorry
+        from this(1) t_app(4) have "Γ ⊢ t2' : T1"
+          by blast
         from this show ?thesis
           using local.e_app_2(1) t_app.hyps(1) by blast
     next
@@ -224,8 +229,7 @@ theorem preservation:
         from this have "app t1 t2 \<rightarrow> t[x ~> t2]"
           using t_app.prems by blast
       from this show ?thesis
-        
-        sorry
+        using empty_context by blast
     qed
   qed
 
