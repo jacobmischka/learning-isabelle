@@ -23,8 +23,9 @@ datatype "term" =
 
 
 definition
-  shift :: "(varName \<Rightarrow> 'a) \<Rightarrow> varName \<Rightarrow> 'a \<Rightarrow> varName \<Rightarrow> 'a"  ("_, <_:_>" [90, 0, 0] 91) where
-  "\<Gamma>, <i:a> = (\<lambda>j. if j < i then \<Gamma> j else if j = i then a else \<Gamma> (j - 1))"
+  shift :: "(varName \<Rightarrow> 'a) \<Rightarrow> varName \<Rightarrow> 'a \<Rightarrow> varName \<Rightarrow> 'a"  ("_, <_:_>" [90, 0, 0] 91)
+    where
+      "\<Gamma>, <i:a> = (\<lambda>j. if j < i then \<Gamma> j else if j = i then a else \<Gamma> (j - 1))"
 
 lemma shift_eq [simp]: "i = j \<Longrightarrow> (\<Gamma>, <i:T>) j = T"
   by (simp add: shift_def)
@@ -106,7 +107,9 @@ lemma canonical_forms_unit [simp]:
 theorem progress:
   fixes t :: "term"
   fixes t' :: "term"
+  fixes T :: "type"
 	assumes d: "\<Gamma> ⊢ t : T"
+  assumes empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "(value t) | (\<exists> t' . t \<rightarrow> t')"
 	using d
   proof induction
@@ -115,7 +118,8 @@ theorem progress:
       by (simp add: value.simps)
   next
     case (t_var Γ x T)
-    then show ?case sorry
+    from this empty_context show ?case
+      by blast
   next
     case (t_app Γ t1 T1 T2 t2)
     then obtain t1' t2' where
@@ -134,7 +138,7 @@ theorem progress:
           t1_abs: "t1 = abs x T3 t3"
           using canonical_forms_abs pt1 t1v by blast
         then have "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
-        show ?case sledgehammer
+        show ?case
           using ‹app (term.abs x T3 t3) t2 → t3[x ~> t2]› t1_abs by blast
       next
         assume t2e: "t2 \<rightarrow> t2'"
@@ -154,12 +158,22 @@ theorem progress:
 qed
 
 lemma subst_lemma:
+  fixes t1 :: "term"
+  fixes t2 :: "term"
+  fixes T1 :: "type"
+  fixes T2 :: "type"
 	assumes d1: "\<Gamma>, <x:T2> ⊢ t1 : T1"
 		and d2: "\<Gamma> ⊢ t2 : T2"
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
 	using d1 d2
   proof induction
     case (t_abs Γ x T1 t2 T2)
+    then obtain t2 T2 where
+      "Γ, <x:T1> ⊢ t2 : T2"
+      and "Γ ⊢ t2 : T2 ⟹ Γ ⊢ t2[x ~> t2] : T2"
+      and "Γ ⊢ t2 : T2"
+      by force
+
     then show ?case sorry
   next
     case (t_var Γ x T)
@@ -199,27 +213,29 @@ theorem preservation:
     from de dih1 dih2 show ?case
     proof cases
       case (e_app_1 t1')
-      from this have "app t1 t2 \<rightarrow> app t1' t2" sledgehammer
+      from this have "app t1 t2 \<rightarrow> app t1' t2"
         using t_app.prems by blast
       from this have "t1 \<rightarrow> t1'"
         using local.e_app_1(2) by blast
-      from this have "Γ ⊢ t1' : T1 -> T2" sorry
-      next
+      from this dih1 have "Γ ⊢ t1' : T1 -> T2" sorry
+      from this show ?thesis
+        using local.e_app_1(1) p2 by blast
+    next
         case (e_app_2 t2')
-        from this have "app t1 t2 \<rightarrow> app t1 t2'" sledgehammer
+        from this have "app t1 t2 \<rightarrow> app t1 t2'"
           using t_app.prems by blast
         from this have "t2 \<rightarrow> t2'"
-          sledgehammer
           by (simp add: local.e_app_2(3))
-        from this dih2 show ?thesis sorry
-      next
+        from this dih2 have "Γ ⊢ t2' : T1"  sorry
+        from this show ?thesis
+          using local.e_app_2(1) p1 by blast
+    next
         case (e_app_abs x T t)
         from this have "app t1 t2 \<rightarrow> t[x ~> t2]"
           using t_app.prems by blast
       then show ?thesis
         using local.e_app_abs(1) local.e_app_abs(2) p1 p2 subst_lemma by blast
-    qed
-          
+    qed 
   next
     case (t_unit Γ)
     then show ?case
