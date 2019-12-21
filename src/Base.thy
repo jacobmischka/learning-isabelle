@@ -58,27 +58,10 @@ inductive "value" :: "term => bool"
       val_abs: "value (abs _ _ _)"
       | val_unit: "value unit"
 
-(*
-primrec liftn :: "[nat, term, nat] => term"
-  where
-    "liftn n (var i) k = (if i < k then var i else var (i + n))"
-  | "liftn n (app s t) k = app (liftn n s k) (liftn n t k)"
-  | "liftn n (abs x T s) k = abs x T (liftn n s (k + 1))"
-  | "liftn n unit k = unit"
-
-primrec substn :: "[term, term, nat] => term"
-  where
-    "substn (var i) s k =
-      (if k < i then var (i - 1) else if i = k then liftn k s 0 else var i)"
-  | "substn (app t u) s k = app (substn t s k) (substn u s k)"
-  | "substn (abs x T t) s k = substn t s (k + 1)"
-  | "substn unit s k = unit"
-*)
-
 inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarrow>" 50)
   where
     e_app_1: "t1 \<rightarrow> t1' \<Longrightarrow> app t1 t2 \<rightarrow> app t1' t2"
-  | e_app_2: "t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
+  | e_app_2: "value t1 \<Longrightarrow> t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
   | e_app_abs: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (substn t t2 x)"
 
 
@@ -107,59 +90,105 @@ lemma subst_gt [simp]: "y < x ==> (var x)[y ~> t] = var (x - 1)"
 lemma subst_lt [simp]: "y > x ==> (var x)[y ~> t] = var x"
   by (simp add: subst_var)
 
-lemma canonical_forms_abs:
+lemma canonical_forms_abs [simp]:
   fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : (T1 -> T2)"
 		and v: "value t"
 	shows "∃ x T1 t2 .t = abs x T1 t2"
   using d typing.cases v value.simps by blast
 
-lemma canonical_forms_unit:
+lemma canonical_forms_unit [simp]:
 	fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : Unit"
 	  and v: "value t"
 	shows "t = unit" using d v value.simps by auto
 
 theorem progress:
+  fixes t :: "term"
+  fixes t' :: "term"
 	assumes d: "\<Gamma> ⊢ t : T"
 	shows "(value t) | (t \<rightarrow> t')"
-	using d proof cases
-case (t_abs x T1 t2 T2)
-  then show ?thesis
-    by (simp add: val_abs)
-next
-  case (t_var x)
-  then show ?thesis sorry
-next
-case (t_app t1 T1 t2)
-  then show ?thesis sorry
-next
-  case t_unit
-  then show ?thesis by (simp add: val_unit)
+	using d
+  proof induction
+    case (t_abs Γ x T1 t2 T2)
+    then show ?case
+      by (simp add: value.simps)
+  next
+    case (t_var Γ x T)
+    then show ?case sorry
+  next
+    case (t_app Γ t1 T1 T2 t2)
+    then obtain t1' t2' where
+        pt1: "Γ ⊢ t1 : T1 -> T2"
+        and pt2: "Γ ⊢ t2 : T1"
+        and t1ih: "value t1 ∨ t1 → t1'"
+        and t2ih: "value t2 ∨ t2 → t2'"
+      by auto
+    from t1ih show ?case
+    proof
+      assume t1v: "value t1"
+      from t2ih show ?case
+      proof
+        assume t2v: "value t2"
+        have t1_abs: "t1 = abs x T3 t3"
+          sorry
+      next
+        assume t2e: "t2 \<rightarrow> t2'"
+        have te: "app t1 t2 \<rightarrow> app t1 t2'"
+          by (simp add: e_app_2 t1v t2e)
+        show "value (app t1 t2) ∨ app t1 t2 → t'" sorry
+      qed
+    next
+      assume t1e: "t1 \<rightarrow> t1'"
+      have te: "app t1 t2 \<rightarrow> app t1' t2"
+        by (simp add: e_app_1 t1e)
+      show "value (app t1 t2) ∨ app t1 t2 → t'" sorry
+    qed
+  next
+    case (t_unit Γ)
+    then show ?case by (simp add: value.simps)
 qed
 
 lemma subst_lemma:
 	assumes d1: "\<Gamma>, <x:T2> ⊢ t1 : T1"
 		and d2: "\<Gamma> ⊢ t2 : T2"
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
-	sorry
+	using d1 d2
+  proof induction
+    case (t_abs Γ x T1 t2 T2)
+    then show ?case sorry
+  next
+    case (t_var Γ x T)
+    then show ?case
+      sorry
+  next
+    case (t_app Γ t1 T1 T2 t2)
+    then show ?case
+      by auto
+  next
+    case (t_unit Γ)
+    then show ?case by auto
+  qed
 
 theorem preservation:
 	assumes d: "\<Gamma> ⊢ t : T"
 		and e: "t \<rightarrow> t'"
 	shows "\<Gamma> ⊢ t' : T"
-	using d proof induction
-case (t_abs Γ x T1 t2 T2)
-then show ?case sorry
-next
-  case (t_var Γ x T)
-  then show ?case sorry
-next
-  case (t_app Γ t1 T1 T2 t2)
-  then show ?case sorry
-next
-  case (t_unit Γ)
-  then show ?case sorry
-
-qed
+	using d e
+  proof induction
+    case (t_abs Γ x T1 t2 T2)
+    then show ?case
+    using evaluation.cases by blast
+  next
+    case (t_var Γ x T)
+    then show ?case
+      using evaluation.cases by blast
+  next
+    case (t_app Γ t1 T1 T2 t2)
+    then show ?case using evaluation.cases sorry
+  next
+    case (t_unit Γ)
+    then show ?case
+      using evaluation.cases by blast
+  qed
 
