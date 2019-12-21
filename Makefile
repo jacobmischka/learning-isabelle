@@ -6,4 +6,4 @@ SRC=src
 all: proofs
 
 proofs: ${SRC}
-	isabelle build -d src Homework14
+	isabelle build -d src LearningIsabelle

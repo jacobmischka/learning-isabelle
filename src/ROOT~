@@ -1,6 +1,6 @@
-chapter Test
+chapter CS732
 
-session LearningIsabelle (Test) = HOL +
+session Homework14 (CS732) = HOL +
 	options [timeout = 600]
 	sessions
 		"HOL-Library"
