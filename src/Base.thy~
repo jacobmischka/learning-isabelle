@@ -11,6 +11,7 @@ datatype "type" =
 	Atom typeName
 	| Arrow type type (infixr "->" 200)
 	| Unit
+        | Top
 
 type_synonym varCtx = "varName => type"
 
@@ -62,6 +63,12 @@ inductive "evaluation" :: "[term, term] \<Rightarrow> bool" (infixl "\<rightarro
   | e_app_2 [intro!]: "value t1 \<Longrightarrow> t2 \<rightarrow> t2' \<Longrightarrow> app t1 t2 \<rightarrow> app t1 t2'"
   | e_app_abs [intro!]: "value t2 \<Longrightarrow> app (abs x T t) t2 \<rightarrow> (t[x ~> t2])"
 
+inductive subtyping :: "[type, type] => bool" (infixl "<:" 50)
+  where
+    s_refl [intro!]: "T <: T"
+    | s_trans [intro!]: "T1 <: T2 ==> T2 <: T3 ==> T1 <: T3"
+    | s_top [intro!]: "T <: Top"
+    | s_arr [intro!]: "T1 <: S1 ==> S2 <: T2 ==> (S1 -> S2) <: (T1 -> T2)"
 
 inductive typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50] 50)
   where
@@ -69,6 +76,7 @@ inductive typing :: "varCtx => term => type => bool" ("_ ⊢ _ : _" [50, 50, 50]
   | t_var [intro!]: "\<Gamma>(x) = T ==> \<Gamma> ⊢ var x : T"
   | t_app [intro!]: "\<Gamma> ⊢ t1 : (T1 -> T2) ==> \<Gamma> ⊢ t2 : T1 ==> \<Gamma>  ⊢ app t1 t2 : T2"
   | t_unit [intro!]: "\<Gamma> ⊢ unit : Unit"
+  | t_sub [intro!]: "\<Gamma> ⊢ t : S ==> (S <: T) ==> \<Gamma> ⊢ t : T"
 
 inductive_cases typing_elims [elim!]:
   "\<Gamma> ⊢ var x : T"
@@ -76,30 +84,31 @@ inductive_cases typing_elims [elim!]:
   "\<Gamma> ⊢ abs x T1 t : T"
   "\<Gamma> ⊢ unit : Unit"
 
-schematic_goal "\<Gamma> ⊢ app (abs x Unit (var x)) unit : ?T"
-	by force
+
 
 lemma subst_eq [simp]: "(var x)[x ~> t] = t"
-  by (simp add: subst_var)
+  by simp
 
 lemma subst_gt [simp]: "y < x ==> (var x)[y ~> t] = var (x - 1)"
-  by (simp add: subst_var)
+  by simp
 
 lemma subst_lt [simp]: "y > x ==> (var x)[y ~> t] = var x"
-  by (simp add: subst_var)
+  by simp
 
 lemma canonical_forms_abs [simp]:
   fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : (T1 -> T2)"
 		and v: "value t"
-	shows "∃ x T1 t2 .t = abs x T1 t2"
-  using d typing.cases v value.simps by blast
+	shows "\<exists> x T1 t2 . t = abs x T1 t2"
+  sorry
+  (*using d typing.cases v value.simps by blast*)
 
 lemma canonical_forms_unit [simp]:
 	fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : Unit"
 	  and v: "value t"
-	shows "t = unit" using d v value.simps by auto
+	shows "t = unit"
+	sorry
 
 theorem progress:
   fixes t t' :: "term"
@@ -109,20 +118,20 @@ theorem progress:
 	shows "(value t) | (\<exists> t' . t \<rightarrow> t')"
 	using d
   proof induction
-    case (t_abs Γ x T1 t2 T2)
+    case (t_abs \<Gamma> x T1 t2 T2)
     then show ?case
       by (simp add: value.simps)
   next
-    case (t_var Γ x T)
+    case (t_var \<Gamma> x T)
     from this empty_context show ?case
       by blast
   next
-    case (t_app Γ t1 T1 T2 t2)
+    case (t_app \<Gamma> t1 T1 T2 t2)
     then obtain t1' t2' where
-        pt1: "Γ ⊢ t1 : T1 -> T2"
-        and pt2: "Γ ⊢ t2 : T1"
-        and t1ih: "value t1 ∨ t1 → t1'"
-        and t2ih: "value t2 ∨ t2 → t2'"
+        pt1: "\<Gamma> ⊢ t1 : T1 -> T2"
+        and pt2: "\<Gamma> ⊢ t2 : T1"
+        and t1ih: "value t1 | t1 \<rightarrow> t1'"
+        and t2ih: "value t2 | t2 \<rightarrow> t2'"
       by auto
     from t1ih show ?case
     proof
@@ -132,10 +141,10 @@ theorem progress:
         assume t2v: "value t2"
         then obtain x T3 t3 where
           t1_abs: "t1 = abs x T3 t3"
-          using canonical_forms_abs pt1 t1v by blast
-        then have "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
+          sorry
+        then have d: "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
         show ?case
-          using ‹app (term.abs x T3 t3) t2 → t3[x ~> t2]› t1_abs by blast
+          using d t1_abs by blast
       next
         assume t2e: "t2 \<rightarrow> t2'"
         have te: "app t1 t2 \<rightarrow> app t1 t2'"
@@ -149,7 +158,7 @@ theorem progress:
       then show ?case by auto
     qed
   next
-    case (t_unit Γ)
+    case (t_unit \<Gamma>)
     then show ?case by (simp add: value.simps)
 qed
 
@@ -161,29 +170,33 @@ lemma subst_lemma:
 		and d2: "\<Gamma> ⊢ t2 : T2"
 	  and empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
-  using d1 d2 empty_context proof induction
-    case (t_abs Γ x T1 t2 T2)
+  using d1 d2 empty_context
+  proof induction
+    case (t_sub Γ t S T)
+    then show ?case sorry
+  next
+    case (t_abs \<Gamma> x T1 t2 T2)
     then show ?case 
-      by blast
+      sorry
   next
-    case (t_var Γ x T)
+    case (t_var \<Gamma> x T)
     then show ?case
-      by blast
+      sorry
   next
-    case (t_app Γ t1 T1 T2 t2)
+    case (t_app \<Gamma> t1 T1 T2 t2)
     then show ?case
       by auto
   next
-    case (t_unit Γ)
+    case (t_unit \<Gamma>)
     then show ?case by auto
   qed
 
 lemma values_dont_evaluate:
   fixes t :: "term"
   assumes v: "value t"
-    and e: "\<forall> t'. t \<rightarrow> t'"
+    and e: "\<exists> t'. t \<rightarrow> t'"
   shows False
-  using e evaluation.cases v value.simps by blast
+  sorry
 
 theorem preservation:
   fixes t t' :: "term"
@@ -193,34 +206,34 @@ theorem preservation:
 	shows "\<Gamma> ⊢ t' : T"
 	using d e
   proof (induction arbitrary: t')
-    case (t_unit Γ)
+    case (t_unit \<Gamma>)
     then show ?case
       using empty_context by blast
   next
-    case (t_abs Γ x T1 t2 T2)
+    case (t_abs \<Gamma> x T1 t2 T2)
     then show ?case
     using evaluation.cases by blast
   next
-    case (t_var Γ x T)
+    case (t_var \<Gamma> x T)
     then show ?case
       using evaluation.cases by blast
   next
-    case (t_app Γ t1 T1 T2 t2)
+    case (t_app \<Gamma> t1 T1 T2 t2)
     
     from this(5) this(1-4) show ?case
     proof (cases)
       case (e_app_1 t1')
-      from this t_app have "Γ ⊢ t1' : T1 -> T2"
+      from this t_app have d1': "\<Gamma> ⊢ t1' : T1 -> T2"
         by blast
       show ?thesis
-        using ‹Γ ⊢ t1' : T1 -> T2› local.e_app_1(1) t_app.hyps(2) by blast
+        using d1' local.e_app_1(1) t_app.hyps(2) by blast
     next
         case (e_app_2 t2')
         from this have "app t1 t2 \<rightarrow> app t1 t2'"
           using t_app.prems by blast
         from this have "t2 \<rightarrow> t2'"
           by (simp add: local.e_app_2(3))
-        from this(1) t_app(4) have "Γ ⊢ t2' : T1"
+        from this(1) t_app(4) have "\<Gamma> ⊢ t2' : T1"
           by blast
         from this show ?thesis
           using local.e_app_2(1) t_app.hyps(1) by blast
@@ -233,3 +246,4 @@ theorem preservation:
     qed
   qed
 
+end
