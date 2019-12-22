@@ -95,20 +95,71 @@ lemma subst_gt [simp]: "y < x ==> (var x)[y ~> t] = var (x - 1)"
 lemma subst_lt [simp]: "y > x ==> (var x)[y ~> t] = var x"
   by simp
 
+lemma subtype_inversion_arrow [simp]:
+  fixes T T1 T2 :: type
+  assumes dt: "T = T1 -> T2"
+  assumes s: "S <: T"
+  shows "\<exists> S1 S2 . S = S1 -> S2 & S2 <: T2 & T1 <: S1"
+  using s dt proof (induction arbitrary: T1 T2)
+case (s_refl T)
+  then show ?case
+    by (simp add: subtyping.s_refl)
+next
+  case (s_trans T1 T2 T3)
+  then show ?case
+    by blast
+next
+  case (s_top T)
+  then show ?case
+    by auto
+next
+  case (s_arr T1 S1 S2 T2)
+  then show ?case
+    by auto
+qed
+
 lemma canonical_forms_abs [simp]:
   fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : (T1 -> T2)"
 		and v: "value t"
+assumes empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "\<exists> x T1 t2 . t = abs x T1 t2"
-  sorry
-  (*using d typing.cases v value.simps by blast*)
+  using d v proof induction
+  case (t_abs \<Gamma> x T1 t2 T2)
+  then show ?case
+    by simp
+next
+  case (t_var \<Gamma> x T)
+  then show ?case
+    using value.cases by blast
+next
+  case (t_app \<Gamma> t1 T1 T2 t2)
+  then show ?case
+    by (metis Base.term.simps(15) value.cases)
+next
+  case (t_unit \<Gamma>)
+  then show ?case
+    using empty_context by auto
+next
+  case (t_sub \<Gamma> t S T)
+  then show ?case
+    by blast
+qed
+
+lemma only_unit_subtype_unit:
+  fixes T :: "type"
+  assumes  s: "T <: Unit"
+  assumes empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
+  shows "T = Unit"
+  using empty_context by auto
 
 lemma canonical_forms_unit [simp]:
 	fixes t :: "term"
 	assumes d: "\<Gamma> ⊢ t : Unit"
 	  and v: "value t"
+	assumes empty_context: "\<forall> x T . \<Gamma>(x) \<noteq> T"
 	shows "t = unit"
-	sorry
+	using empty_context by auto
 
 theorem progress:
   fixes t t' :: "term"
@@ -141,7 +192,7 @@ theorem progress:
         assume t2v: "value t2"
         then obtain x T3 t3 where
           t1_abs: "t1 = abs x T3 t3"
-          sorry
+          using empty_context by blast
         then have d: "app (abs x T3 t3) t2 \<rightarrow> t3[x ~> t2]"  by (simp add: e_app_abs t2v t1_abs)
         show ?case
           using d t1_abs by blast
@@ -172,16 +223,17 @@ lemma subst_lemma:
 	shows "\<Gamma> ⊢ t1[x ~> t2] : T1"
   using d1 d2 empty_context
   proof induction
-    case (t_sub Γ t S T)
-    then show ?case sorry
+    case (t_sub \<Gamma> t S T)
+    then show ?case
+      by auto
   next
     case (t_abs \<Gamma> x T1 t2 T2)
-    then show ?case 
-      sorry
+    then show ?case
+      by auto
   next
     case (t_var \<Gamma> x T)
     then show ?case
-      sorry
+      by auto
   next
     case (t_app \<Gamma> t1 T1 T2 t2)
     then show ?case
@@ -196,7 +248,7 @@ lemma values_dont_evaluate:
   assumes v: "value t"
     and e: "\<exists> t'. t \<rightarrow> t'"
   shows False
-  sorry
+  using e evaluation.cases v value.simps by blast
 
 theorem preservation:
   fixes t t' :: "term"
@@ -206,27 +258,31 @@ theorem preservation:
 	shows "\<Gamma> ⊢ t' : T"
 	using d e
   proof (induction arbitrary: t')
+    case (t_sub \<Gamma> t S T)
+    then show ?case
+      using empty_context by auto
+  next
     case (t_unit \<Gamma>)
     then show ?case
-      using empty_context by blast
+      using empty_context by auto
   next
     case (t_abs \<Gamma> x T1 t2 T2)
     then show ?case
-    using evaluation.cases by blast
+      using empty_context by auto
   next
     case (t_var \<Gamma> x T)
     then show ?case
-      using evaluation.cases by blast
+      using empty_context by auto
   next
     case (t_app \<Gamma> t1 T1 T2 t2)
-    
+
     from this(5) this(1-4) show ?case
     proof (cases)
       case (e_app_1 t1')
       from this t_app have d1': "\<Gamma> ⊢ t1' : T1 -> T2"
-        by blast
+        by simp
       show ?thesis
-        using d1' local.e_app_1(1) t_app.hyps(2) by blast
+        using empty_context by auto
     next
         case (e_app_2 t2')
         from this have "app t1 t2 \<rightarrow> app t1 t2'"
@@ -234,15 +290,15 @@ theorem preservation:
         from this have "t2 \<rightarrow> t2'"
           by (simp add: local.e_app_2(3))
         from this(1) t_app(4) have "\<Gamma> ⊢ t2' : T1"
-          by blast
+          by simp
         from this show ?thesis
-          using local.e_app_2(1) t_app.hyps(1) by blast
+          using empty_context by auto
     next
         case (e_app_abs x T t)
         from this have "app t1 t2 \<rightarrow> t[x ~> t2]"
           using t_app.prems by blast
       from this show ?thesis
-        using empty_context by blast
+        using empty_context by auto
     qed
   qed
 
